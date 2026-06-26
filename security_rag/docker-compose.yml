@@ -1,0 +1,39 @@
+services:
+  db:
+    # Official pgvector image: Postgres 16 + pgvector >= 0.8 preinstalled.
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-raguser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ragpass}
+      POSTGRES_DB: ${POSTGRES_DB:-securityrag}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-raguser} -d ${POSTGRES_DB:-securityrag}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # No host port exposed by default — DB stays internal to the compose network.
+    # Uncomment to inspect from the VM host:
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-raguser}:${POSTGRES_PASSWORD:-ragpass}@db:5432/${POSTGRES_DB:-securityrag}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      VOYAGE_API_KEY: ${VOYAGE_API_KEY}
+      EMBED_MODEL: ${EMBED_MODEL:-voyage-3}
+      EMBED_DIMS: ${EMBED_DIMS:-1024}
+      ANSWER_MODEL: ${ANSWER_MODEL:-claude-sonnet-4-6}
+      PARSE_MODEL: ${PARSE_MODEL:-claude-haiku-4-5-20251001}
+    ports:
+      - "${API_PORT:-8000}:8000"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
