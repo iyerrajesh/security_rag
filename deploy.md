@@ -54,42 +54,23 @@ Edit `.env` on the server and fill in real `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`
 
 ```bash
 docker compose up -d --build
-curl localhost:8000/health
+curl localhost/health   # via Caddy on :80
 ```
 
-## 5. Put TLS in front of it (Caddy)
+`docker compose up` brings up `db`, `api`, and `caddy` together — `api` has no host port mapping (internal to the compose network only), and [Caddyfile](Caddyfile) reverse-proxies `:80` to `api:8000`, so this one command gets you a working HTTP endpoint with no extra TLS setup needed yet.
 
-Caddy auto-issues Let's Encrypt certs. Add a `caddy` service and stop exposing `api` directly:
+## 5. Add a domain + real TLS (later)
 
-```yaml
-# docker-compose.yml additions
-services:
-  api:
-    # remove the `ports:` block — keep it internal to the compose network
+Right now [Caddyfile](Caddyfile) listens on bare `:80` since there's no domain — fine for testing, but unencrypted. Once you have a domain:
 
-  caddy:
-    image: caddy:2
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - caddy_data:/data
-    depends_on:
-      - api
-
-volumes:
-  caddy_data:
-```
-
-`Caddyfile`:
-```
-your-domain.com {
-  reverse_proxy api:8000
-}
-```
-
-Point your domain's A record at the droplet IP first, then `docker compose up -d`.
+1. Point its A record at the droplet IP.
+2. Edit [Caddyfile](Caddyfile), replacing `:80` with the domain:
+   ```
+   your-domain.com {
+     reverse_proxy api:8000
+   }
+   ```
+3. `docker compose up -d` — Caddy auto-issues and renews a Let's Encrypt cert, no other config needed.
 
 ## 6. Day-2 basics
 
