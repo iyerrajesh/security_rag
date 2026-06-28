@@ -19,6 +19,7 @@ jobs:
             cd /srv/security_rag
             git pull origin main
             docker compose up -d --build
+            docker compose restart caddy
             set -a
             . ./.env
             set +a
