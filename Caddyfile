@@ -1,3 +1,5 @@
 :80 {
-  reverse_proxy api:8000
+  @authorized header X-Api-Key {$API_SECRET}
+  reverse_proxy @authorized api:8000
+  respond 403
 }

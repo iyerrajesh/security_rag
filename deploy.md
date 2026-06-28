@@ -50,14 +50,14 @@ git config core.sshCommand "ssh -i ~/.ssh/deploy_key"
 cp .env.local .env
 ```
 
-Edit `.env` on the server and fill in real `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, and a strong `POSTGRES_PASSWORD`. Don't reuse a value you've shared anywhere else.
+Edit `.env` on the server and fill in real `ANTHROPIC_API_KEY`, `VOYAGE_API_KEY`, a strong `POSTGRES_PASSWORD`, and a random `API_SECRET` (e.g. `openssl rand -hex 32`). Don't reuse a value you've shared anywhere else.
 
 ```bash
 docker compose up -d --build
-curl localhost/health   # via Caddy on :80
+curl -H "X-Api-Key: $API_SECRET" localhost/health   # via Caddy on :80
 ```
 
-`docker compose up` brings up `db`, `api`, and `caddy` together — `api` has no host port mapping (internal to the compose network only), and [Caddyfile](Caddyfile) reverse-proxies `:80` to `api:8000`, so this one command gets you a working HTTP endpoint with no extra TLS setup needed yet.
+`docker compose up` brings up `db`, `api`, and `caddy` together — `api` has no host port mapping (internal to the compose network only), and [Caddyfile](Caddyfile) reverse-proxies `:80` to `api:8000` *only* for requests carrying the correct `X-Api-Key` header (everything else gets `403`), so this one command gets you an access-gated HTTP endpoint with no extra TLS setup needed yet.
 
 ## 5. Add a domain + real TLS (later)
 
