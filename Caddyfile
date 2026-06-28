@@ -1,5 +1,5 @@
 :80 {
-  @authorized header X-Api-Key {$API_SECRET}
-  reverse_proxy @authorized api:8000
-  respond 403
+  @blocked not header X-Api-Key {$API_SECRET}
+  respond @blocked 403
+  reverse_proxy api:8000
 }
