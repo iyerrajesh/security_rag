@@ -19,8 +19,11 @@ jobs:
             cd /srv/security_rag
             git pull origin main
             docker compose up -d --build
+            set -a
+            . ./.env
+            set +a
             for i in $(seq 1 10); do
-              curl -fs localhost/health && exit 0
+              curl -fs -H "X-Api-Key: $API_SECRET" localhost/health && exit 0
               sleep 3
             done
             echo "health check failed after deploy"
