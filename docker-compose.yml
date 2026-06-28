@@ -31,9 +31,21 @@ services:
       EMBED_DIMS: ${EMBED_DIMS:-1024}
       ANSWER_MODEL: ${ANSWER_MODEL:-claude-sonnet-4-6}
       PARSE_MODEL: ${PARSE_MODEL:-claude-haiku-4-5-20251001}
-    ports:
-      - "${API_PORT:-8000}:8000"
+    # ports:
+    #   - "${API_PORT:-8000}:8000"
     restart: unless-stopped
+  
+  caddy:
+    image: caddy:2
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    depends_on:
+      - api
 
 volumes:
   pgdata:
+  caddy_data:
