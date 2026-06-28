@@ -18,10 +18,16 @@ Output ONLY raw JSON, no markdown, no preamble. Schema:
 }
 detection_type is one of: loitering, intrusion, package_theft, tailgating,
 vehicle, crowd, abandoned_object, or null.
-relative_time is one of: today, yesterday, last_24h, last_7d, last_weekend,
-this_week, last_week, or null.
+relative_time is one of: today, yesterday, last_24h, last_Nd (N = number of
+days, e.g. last_15d for "last 15 days"), last_Nw (N = number of weeks, e.g.
+last_2w for "past 2 weeks"), last_weekend, this_week, last_week, this_month,
+last_month, or null.
 Use absolute ISO8601 in start/end only if the user gives explicit dates.
 If a field is not mentioned, use null. Never invent values."""
+
+
+def _first_of_month(d: datetime) -> datetime:
+    return d.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 def _resolve_relative_time(rel: str, now: datetime):
@@ -33,8 +39,6 @@ def _resolve_relative_time(rel: str, now: datetime):
         return s, s + timedelta(days=1)
     if rel == "last_24h":
         return now - timedelta(hours=24), now
-    if rel == "last_7d":
-        return now - timedelta(days=7), now
     if rel == "this_week":
         s = (now - timedelta(days=now.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
         return s, now
@@ -43,10 +47,22 @@ def _resolve_relative_time(rel: str, now: datetime):
         return this_mon - timedelta(days=7), this_mon
     if rel == "last_weekend":
         days_since_sat = (now.weekday() - 5) % 7
+        if days_since_sat < 2:  # today is Sat/Sun itself -> that's this weekend, not last
+            days_since_sat += 7
         sat = (now - timedelta(days=days_since_sat)).replace(hour=0, minute=0, second=0, microsecond=0)
-        if sat > now:
-            sat -= timedelta(days=7)
         return sat, sat + timedelta(days=2)
+    if rel == "this_month":
+        return _first_of_month(now), now
+    if rel == "last_month":
+        first_this = _first_of_month(now)
+        first_prev = _first_of_month(first_this - timedelta(days=1))
+        return first_prev, first_this
+    m = re.fullmatch(r"last_(\d+)d", rel)
+    if m:
+        return now - timedelta(days=int(m.group(1))), now
+    m = re.fullmatch(r"last_(\d+)w", rel)
+    if m:
+        return now - timedelta(weeks=int(m.group(1))), now
     return None, None
 
 
