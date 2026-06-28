@@ -1,0 +1,27 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to droplet
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_HOST }}
+          username: root
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          script: |
+            set -e
+            cd /srv/security_rag
+            git pull origin main
+            docker compose up -d --build
+            for i in $(seq 1 10); do
+              curl -fs localhost:8000/health && exit 0
+              sleep 3
+            done
+            echo "health check failed after deploy"
+            exit 1
