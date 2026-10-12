@@ -1,8 +1,11 @@
 name: Deploy
 
+# Auto-deploy on push to main is temporarily disabled; run manually from the Actions tab.
+# To re-enable, restore:
+#   push:
+#     branches: [main]
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
   deploy:

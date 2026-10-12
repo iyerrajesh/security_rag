@@ -48,6 +48,56 @@ services:
     depends_on:
       - api
 
+  # ---- Data platform (local only) -------------------------------------------
+  # Profile-gated so the production `docker compose up` never starts these.
+  # Start with: docker compose --profile m1 up -d
+  kafka:
+    image: apache/kafka:3.8.1
+    profiles: [m1]
+    hostname: kafka
+    environment:
+      # Single-node KRaft: this node is both broker and controller, no ZooKeeper.
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # PLAINTEXT for containers on the compose network, EXTERNAL for the host.
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://127.0.0.1:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # Topics are created explicitly by kafka-init with known partition counts.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_HEAP_OPTS: -Xms512m -Xmx1g
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    ports:
+      - "127.0.0.1:9094:9094"
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+
+  kafka-init:
+    image: apache/kafka:3.8.1
+    profiles: [m1]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./infrastructure/kafka/create-topics.sh:/create-topics.sh:ro
+    entrypoint: ["bash", "/create-topics.sh"]
+    environment:
+      BOOTSTRAP: kafka:9092
+    restart: "no"
+
 volumes:
   pgdata:
   caddy_data:
+  kafkadata:
