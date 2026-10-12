@@ -36,39 +36,40 @@ Decisions that follow:
 
 ### Phase 1 — Data model (Week 1)
 
-- [ ] Write `architecture/data-model.md` covering the five event types
+- [x] Write `architecture/data-model.md` covering the five event types
       (telemetry, perception, planning, health, software).
-- [ ] Define each event type as a Pydantic model in `schemas/` so the simulator,
+- [x] Define each event type as a Pydantic model in `schemas/` so the simulator,
       validator, and Iceberg table schemas share one source of truth.
-- [ ] Commit one example JSON record per event type.
-- [ ] Commit the initial architecture diagram to `architecture/architecture.md`.
+- [x] Commit one example JSON record per event type.
+- [x] Commit the initial architecture diagram to `architecture/architecture.md`.
 
 **Deliverables:** data model doc, event schemas, example JSON, architecture diagram.
 
 ### Phase 2 — Fleet simulator (Weeks 1–2)
 
-- [ ] Build `simulator/` with a CLI: `--vehicles`, `--events-per-second`, `--duration`, `--seed`.
-- [ ] Model each vehicle as a state machine so telemetry, perception, and planning
+- [x] Build `simulator/` with a CLI: `--vehicles`, `--events-per-second`, `--duration`, `--seed`.
+- [x] Model each vehicle as a state machine so telemetry, perception, and planning
       stay physically consistent (speed, braking, trajectory changes).
-- [ ] Add a scenario injector for the nine named scenarios: normal driving, pedestrian
+- [x] Add a scenario injector for the nine named scenarios: normal driving, pedestrian
       crossing, hard braking, sensor failure, network degradation, rain, night,
       construction zone, software deployment.
-- [ ] Implement the correlated failure chain:
+- [x] Implement the correlated failure chain:
       firmware 3.2 → camera degradation → lower pedestrian confidence → emergency braking.
-- [ ] First sink is JSONL files so the simulator is testable before Kafka exists.
-- [ ] Generate and commit small sample datasets (100 vehicles, 60 s).
+- [x] First sink is JSONL files so the simulator is testable before Kafka exists.
+- [x] Generate and commit small sample datasets (100 vehicles, 60 s).
 
 **Deliverables:** simulator, configurable rates, scenario generator, reproducible seed, sample data.
 
 ### Phase 3 — Kafka ingestion (Weeks 2–3)
 
-- [ ] Add single-node Kafka (KRaft mode, no ZooKeeper) to `docker-compose.yml`.
-- [ ] Create topics `vehicle.telemetry`, `vehicle.perception`, `vehicle.planning`,
+- [x] Add single-node Kafka (KRaft mode, no ZooKeeper) to `docker-compose.yml`.
+- [x] Create topics `vehicle.telemetry`, `vehicle.perception`, `vehicle.planning`,
       `vehicle.health`, `vehicle.software`, keyed/partitioned by `vehicle_id`.
-- [ ] Write a Kafka producer sink for the simulator.
+- [x] Write a Kafka producer sink for the simulator.
 - [ ] Write a consumer that lands raw events to MinIO (prepares for Phase 5).
-- [ ] Benchmark throughput at 100 and 1,000 vehicles; record in `architecture/benchmarks.md`.
-- [ ] Document partitioning, ordering, consumer groups, replay, retention,
+      **Deferred to Phase 5**, which adds MinIO.
+- [x] Benchmark throughput at 100 and 1,000 vehicles; record in `architecture/benchmarks.md`.
+- [x] Document partitioning, ordering, consumer groups, replay, retention,
       throughput, and backpressure in `ingestion/README.md`.
 
 **Deliverables:** Kafka deployment, producers, consumers, topic config, throughput benchmark, Kafka docs.
@@ -76,6 +77,7 @@ Decisions that follow:
 ### Phase 5 — Lakehouse (Weeks 3–4)
 
 - [ ] Add MinIO and an Iceberg REST catalog to compose; write with PyIceberg.
+- [ ] Kafka → MinIO raw-event consumer (carried over from Phase 3).
 - [ ] Create `raw`, `validated`, `curated` namespaces.
 - [ ] Create tables: `raw_perception`, `validated_perception`, `vehicle_telemetry`,
       `vehicle_health`, `software_deployments`.

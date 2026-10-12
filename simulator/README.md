@@ -21,6 +21,7 @@ the script, run `pip install -r simulator/requirements.txt` and then `python -m 
 | `--compress` | off | Write `.jsonl.gz` |
 | `--sink` | `jsonl` | `jsonl` files, or `kafka` (see [ingestion/](../ingestion/README.md)) |
 | `--bootstrap-servers` | `127.0.0.1:9094` | Kafka brokers, for `--sink kafka` |
+| `--producer-config` | — | `KEY=VALUE` librdkafka setting, repeatable (e.g. `queue.buffering.max.messages=1000`) |
 | `--start-time` | `2026-10-04T10:00:00Z` (jsonl), now (kafka) | Simulated clock start |
 | `--scenario-rate` | 1.0 | Multiplier on scenario injection rates |
 | `--faulty-share` | 0.3 | Fraction of the fleet starting on firmware 3.2 |
