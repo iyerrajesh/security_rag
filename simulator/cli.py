@@ -26,6 +26,13 @@ def _utc(value: str) -> datetime:
     return dt
 
 
+def _key_value(value: str) -> tuple[str, str]:
+    key, sep, val = value.partition("=")
+    if not sep or not key:
+        raise argparse.ArgumentTypeError("expected key=value")
+    return key, val
+
+
 def main(argv=None) -> None:
     p = argparse.ArgumentParser(prog="python -m simulator", description="Synthetic AV fleet event generator.")
     p.add_argument("--vehicles", type=_positive(int), default=100)
@@ -38,6 +45,8 @@ def main(argv=None) -> None:
                    help="output directory (with --sink kafka: ground-truth labels and manifest only)")
     p.add_argument("--compress", action="store_true", help="write .jsonl.gz (jsonl sink)")
     p.add_argument("--bootstrap-servers", default="127.0.0.1:9094", help="Kafka bootstrap servers (kafka sink)")
+    p.add_argument("--producer-config", type=_key_value, action="append", default=[], metavar="KEY=VALUE",
+                   help="librdkafka producer setting, repeatable, e.g. queue.buffering.max.messages=1000")
     p.add_argument("--start-time", type=_utc,
                    help=f"sim start, ISO 8601 with timezone (default: {DEFAULT_START:%Y-%m-%dT%H:%M:%SZ} for jsonl; "
                         "now for kafka, since Kafka retention deletes messages whose event time is too old)")
@@ -57,17 +66,27 @@ def main(argv=None) -> None:
     )
     started = time.monotonic()
     if args.sink == "kafka":
-        sink = KafkaSink(args.bootstrap_servers, args.output)
+        sink = KafkaSink(args.bootstrap_servers, args.output, **dict(args.producer_config))
     else:
         sink = JsonlSink(args.output, compress=args.compress)
-    with sink:
+    error = None
+    try:
         counts = run(cfg, sink)
+    finally:
+        try:
+            sink.close()
+        except RuntimeError as exc:  # delivery failures: still write the manifest, then fail
+            error = exc
     elapsed = time.monotonic() - started
 
     manifest = {
-        "config": {**vars(args), "output": str(args.output), "start_time": args.start_time.isoformat()},
+        "config": {**vars(args), "output": str(args.output), "start_time": args.start_time.isoformat(),
+                   "producer_config": dict(args.producer_config)},
         "counts": dict(sorted(counts.items())),
+        "elapsed_seconds": round(elapsed, 2),
     }
+    if isinstance(sink, KafkaSink):
+        manifest["kafka"] = sink.stats()
     (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
     events = sum(n for k, n in counts.items() if not k.startswith("scenario:"))
@@ -75,3 +94,11 @@ def main(argv=None) -> None:
           file=sys.stderr)
     for k, n in sorted(counts.items()):
         print(f"  {k:32} {n:>10,}", file=sys.stderr)
+    if isinstance(sink, KafkaSink):
+        k = manifest["kafka"]
+        print(f"  kafka: delivered={k['delivered']:,} failed={k['failed']:,} queue_full={k['queue_full']:,} "
+              f"blocked={k['blocked_seconds']}s max_queue={k['max_queue_depth']:,} "
+              f"max_throttle={k['max_broker_throttle_ms']}ms", file=sys.stderr)
+    if error:
+        print(f"error: {error}", file=sys.stderr)
+        sys.exit(1)

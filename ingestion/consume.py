@@ -9,6 +9,7 @@ Exits after `--idle-timeout` seconds with no new messages.
 """
 
 import argparse
+import json
 import sys
 import time
 import uuid
@@ -26,6 +27,8 @@ def main(argv=None) -> int:
     p.add_argument("--group-id", help="consumer group (default: a fresh group, so nothing is committed for others)")
     p.add_argument("--from-beginning", action="store_true", help="start at the earliest offset for a new group")
     p.add_argument("--idle-timeout", type=float, default=5.0)
+    p.add_argument("--delay-ms", type=float, default=0.0, help="sleep per message, to simulate a slow consumer")
+    p.add_argument("--summary-json", help="also write the results to this file")
     args = p.parse_args(argv)
 
     consumer = Consumer({
@@ -57,6 +60,8 @@ def main(argv=None) -> int:
                 if msg.error().code() != KafkaError._PARTITION_EOF:
                     print(f"error: {msg.error()}", file=sys.stderr)
                 continue
+            if args.delay_ms:
+                time.sleep(args.delay_ms / 1000)
             last_message = time.monotonic()
             counts[msg.topic()] += 1
             try:
@@ -79,6 +84,18 @@ def main(argv=None) -> int:
     for topic in sorted(TOPICS.values()):
         print(f"  {topic:22} {counts[topic]:>10,}  invalid={invalid[topic]}")
     print(f"vehicles={len({v for _, v in last_ts})} key_mismatch={key_mismatch} out_of_order={out_of_order}")
+    if args.summary_json:
+        with open(args.summary_json, "w") as f:
+            json.dump({
+                "consumed": total,
+                "elapsed_seconds": round(elapsed, 2),
+                "rate": round(total / elapsed),
+                "per_topic": {t: counts[t] for t in sorted(TOPICS.values())},
+                "invalid": sum(invalid.values()),
+                "key_mismatch": key_mismatch,
+                "out_of_order": out_of_order,
+                "vehicles": len({v for _, v in last_ts}),
+            }, f, indent=2)
     return 1 if (sum(invalid.values()) or key_mismatch or out_of_order) else 0
 
 

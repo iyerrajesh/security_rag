@@ -121,7 +121,14 @@ outstanding. The run fails loudly if any message was never delivered.
 Consumers pull at their own pace, so a slow consumer builds up lag rather than
 backpressure. Lag is the metric to alert on in Phase 12.
 
-## Still to do in Phase 3
+These behaviours are covered by repeatable tests in
+[`infrastructure/chaos/`](../infrastructure/chaos/README.md): broker pause, message
+timeout, bounded queue, broker throttling, slow consumer, and consumer crash/restart.
 
-- [ ] Consumer that lands raw events in MinIO (once MinIO is added in Phase 5)
-- [ ] Formal benchmark at 100 and 1,000 vehicles in `architecture/benchmarks.md`
+## Status
+
+- [x] Single-node KRaft broker, topic creation, Kafka UI (`docker compose --profile m1 up -d`)
+- [x] Producer sink (`simulator --sink kafka`) and verifier consumer (`ingestion.consume`)
+- [x] Throughput benchmark at 100 and 1,000 vehicles in [`architecture/benchmarks.md`](../architecture/benchmarks.md)
+- [x] Backpressure and failure tests in [`infrastructure/chaos/`](../infrastructure/chaos/README.md)
+- [ ] Consumer that lands raw events in MinIO. **Moved to Phase 5**, which adds MinIO.

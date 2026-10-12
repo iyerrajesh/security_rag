@@ -97,6 +97,21 @@ services:
       BOOTSTRAP: kafka:9092
     restart: "no"
 
+  # Web UI for browsing topics, messages, and consumer groups: http://localhost:8080
+  kafka-ui:
+    image: ghcr.io/kafbat/kafka-ui:latest
+    profiles: [m1]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      DYNAMIC_CONFIG_ENABLED: "true"
+      # Pre-register the local cluster so the UI is usable without setup.
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    ports:
+      - "127.0.0.1:8080:8080"
+
 volumes:
   pgdata:
   caddy_data:
