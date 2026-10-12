@@ -1,0 +1,11 @@
+{
+  "event_type": "planning",
+  "schema_version": 1,
+  "event_id": "3f1c2a9e-8b4d-4e2f-9a61-0c7d5e8b1a03",
+  "vehicle_id": "V1023",
+  "timestamp": "2026-10-04T10:30:15Z",
+  "planned_action": "stop",
+  "target_speed": 0.0,
+  "emergency_braking": true,
+  "trajectory_id": "T55190"
+}

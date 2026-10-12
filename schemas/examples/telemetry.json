@@ -1,0 +1,14 @@
+{
+  "event_type": "telemetry",
+  "schema_version": 1,
+  "event_id": "3f1c2a9e-8b4d-4e2f-9a61-0c7d5e8b1a01",
+  "vehicle_id": "V1023",
+  "timestamp": "2026-10-04T10:30:15Z",
+  "speed": 4.2,
+  "acceleration": -6.8,
+  "braking": 0.92,
+  "steering": -3.5,
+  "battery": 71.4,
+  "gps_lat": 37.7749,
+  "gps_lon": -122.4194
+}

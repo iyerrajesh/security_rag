@@ -1,0 +1,11 @@
+{
+  "event_type": "software",
+  "schema_version": 1,
+  "event_id": "3f1c2a9e-8b4d-4e2f-9a61-0c7d5e8b1a05",
+  "vehicle_id": "V1023",
+  "timestamp": "2026-10-04T08:00:00Z",
+  "software_version": "4.7",
+  "perception_version": "2.1.0",
+  "firmware_version": "3.2",
+  "deployment_id": "D2026-10-04-01"
+}

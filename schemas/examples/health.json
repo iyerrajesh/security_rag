@@ -1,0 +1,13 @@
+{
+  "event_type": "health",
+  "schema_version": 1,
+  "event_id": "3f1c2a9e-8b4d-4e2f-9a61-0c7d5e8b1a04",
+  "vehicle_id": "V1023",
+  "timestamp": "2026-10-04T10:30:15Z",
+  "cpu": 63.5,
+  "memory": 58.2,
+  "gpu": 81.0,
+  "camera_status": "degraded",
+  "lidar_status": "ok",
+  "network_latency": 42.7
+}
