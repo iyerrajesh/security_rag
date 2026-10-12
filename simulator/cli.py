@@ -2,12 +2,12 @@ import argparse
 import json
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from . import config as C
 from .engine import DEFAULT_START, SimulationConfig, run
-from .sinks import JsonlSink
+from .sinks import JsonlSink, KafkaSink
 
 
 def _positive(kind):
@@ -33,14 +33,22 @@ def main(argv=None) -> None:
                    help="report rate per vehicle, in Hz (default: 1)")
     p.add_argument("--duration", type=_positive(float), default=60.0, help="simulated seconds (default: 60)")
     p.add_argument("--seed", type=int, default=42)
-    p.add_argument("--output", type=Path, default=Path("output/sim"), help="output directory")
-    p.add_argument("--compress", action="store_true", help="write .jsonl.gz")
-    p.add_argument("--start-time", type=_utc, default=DEFAULT_START, help="sim start, ISO 8601 with timezone")
+    p.add_argument("--sink", choices=("jsonl", "kafka"), default="jsonl")
+    p.add_argument("--output", type=Path, default=Path("output/sim"),
+                   help="output directory (with --sink kafka: ground-truth labels and manifest only)")
+    p.add_argument("--compress", action="store_true", help="write .jsonl.gz (jsonl sink)")
+    p.add_argument("--bootstrap-servers", default="127.0.0.1:9094", help="Kafka bootstrap servers (kafka sink)")
+    p.add_argument("--start-time", type=_utc,
+                   help=f"sim start, ISO 8601 with timezone (default: {DEFAULT_START:%Y-%m-%dT%H:%M:%SZ} for jsonl; "
+                        "now for kafka, since Kafka retention deletes messages whose event time is too old)")
     p.add_argument("--scenario-rate", type=float, default=1.0, help="multiplier on scenario injection rates")
     p.add_argument("--faulty-share", type=float, default=C.INITIAL_FAULTY_SHARE,
                    help="fraction of the fleet starting on firmware 3.2")
     p.add_argument("--realtime", action="store_true", help="pace output to wall-clock time")
     args = p.parse_args(argv)
+    if args.start_time is None:
+        args.start_time = (datetime.now(timezone.utc).replace(microsecond=0) if args.sink == "kafka"
+                           else DEFAULT_START)
 
     cfg = SimulationConfig(
         vehicles=args.vehicles, events_per_second=args.events_per_second, duration=args.duration,
@@ -48,7 +56,11 @@ def main(argv=None) -> None:
         faulty_share=args.faulty_share, realtime=args.realtime,
     )
     started = time.monotonic()
-    with JsonlSink(args.output, compress=args.compress) as sink:
+    if args.sink == "kafka":
+        sink = KafkaSink(args.bootstrap_servers, args.output)
+    else:
+        sink = JsonlSink(args.output, compress=args.compress)
+    with sink:
         counts = run(cfg, sink)
     elapsed = time.monotonic() - started
 

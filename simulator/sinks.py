@@ -68,3 +68,74 @@ class MemorySink:
 
     def close(self) -> None:
         pass
+
+
+class KafkaSink:
+    """Produces events to `vehicle.<event_type>` topics, keyed by `vehicle_id`.
+
+    Keying by vehicle keeps each vehicle's events ordered within one partition.
+    Ground-truth labels are not events, so they go to `<label_dir>/scenarios.jsonl`.
+    """
+
+    def __init__(self, bootstrap_servers: str, label_dir: Path, **producer_config):
+        from confluent_kafka import Producer  # optional dependency: only needed for this sink
+
+        from schemas import TOPICS
+
+        self._topics = {model.model_fields["event_type"].default: topic for model, topic in TOPICS.items()}
+        self._producer = Producer({
+            "bootstrap.servers": bootstrap_servers,
+            "enable.idempotence": True,  # acks=all, no duplicates on producer retry
+            "partitioner": "murmur2_random",  # same key -> partition mapping as Java/Flink producers
+            "linger.ms": 20,
+            "batch.size": 256 * 1024,
+            "compression.type": "lz4",
+            **producer_config,
+        })
+        self._labels = JsonlSink(label_dir)
+        self.delivered = 0
+        self.failed = 0
+        self.first_error = None
+
+    def _on_delivery(self, err, _msg) -> None:
+        if err is None:
+            self.delivered += 1
+        else:
+            self.failed += 1
+            self.first_error = self.first_error or err
+
+    def write(self, event: BaseEvent) -> None:
+        kwargs = dict(
+            topic=self._topics[event.event_type],
+            key=event.vehicle_id.encode(),
+            value=event.model_dump_json().encode(),
+            timestamp=int(event.timestamp.timestamp() * 1000),  # Kafka timestamp = event time
+            headers={"schema_version": str(event.schema_version)},
+            on_delivery=self._on_delivery,
+        )
+        while True:
+            try:
+                self._producer.produce(**kwargs)
+                break
+            except BufferError:
+                # Local queue full: backpressure. Serve delivery callbacks until there is room.
+                self._producer.poll(0.1)
+        self._producer.poll(0)
+
+    def write_label(self, record: dict) -> None:
+        self._labels.write_label(record)
+
+    def close(self) -> None:
+        remaining = self._producer.flush(60)
+        self._labels.close()
+        if remaining or self.failed:
+            raise RuntimeError(
+                f"Kafka delivery incomplete: {self.failed} failed, {remaining} undelivered "
+                f"(first error: {self.first_error})"
+            )
+
+    def __enter__(self) -> "KafkaSink":
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.close()

@@ -19,7 +19,9 @@ the script, run `pip install -r simulator/requirements.txt` and then `python -m 
 | `--seed` | 42 | Same seed ⇒ byte-identical output |
 | `--output` | `output/sim` | Output directory (git-ignored) |
 | `--compress` | off | Write `.jsonl.gz` |
-| `--start-time` | `2026-10-04T10:00:00Z` | Simulated clock start |
+| `--sink` | `jsonl` | `jsonl` files, or `kafka` (see [ingestion/](../ingestion/README.md)) |
+| `--bootstrap-servers` | `127.0.0.1:9094` | Kafka brokers, for `--sink kafka` |
+| `--start-time` | `2026-10-04T10:00:00Z` (jsonl), now (kafka) | Simulated clock start |
 | `--scenario-rate` | 1.0 | Multiplier on scenario injection rates |
 | `--faulty-share` | 0.3 | Fraction of the fleet starting on firmware 3.2 |
 | `--realtime` | off | Pace output to wall-clock time instead of running flat out |
