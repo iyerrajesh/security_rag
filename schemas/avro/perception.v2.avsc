@@ -1,0 +1,95 @@
+{
+  "type": "record",
+  "name": "PerceptionEvent",
+  "namespace": "av.fleet",
+  "doc": "A single detected object (topic: vehicle.perception). Schema version 2.",
+  "fields": [
+    {
+      "name": "schema_version",
+      "type": "int",
+      "doc": "Schema version of this event type",
+      "default": 2
+    },
+    {
+      "name": "event_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Unique id used for deduplication"
+    },
+    {
+      "name": "vehicle_id",
+      "type": "string"
+    },
+    {
+      "name": "timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "Event time (timezone-aware, normalized to UTC)"
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "perception"
+    },
+    {
+      "name": "object_id",
+      "type": "string"
+    },
+    {
+      "name": "object_type",
+      "type": {
+        "type": "enum",
+        "name": "ObjectType",
+        "namespace": "av.fleet",
+        "symbols": [
+          "pedestrian",
+          "vehicle",
+          "cyclist",
+          "motorcycle",
+          "traffic_cone",
+          "traffic_sign",
+          "animal",
+          "unknown"
+        ],
+        "default": "unknown"
+      }
+    },
+    {
+      "name": "confidence",
+      "type": "double",
+      "doc": "Detection confidence, 0 to 1"
+    },
+    {
+      "name": "x",
+      "type": "double",
+      "doc": "Object position in the vehicle frame, metres forward"
+    },
+    {
+      "name": "y",
+      "type": "double",
+      "doc": "Object position in the vehicle frame, metres left"
+    },
+    {
+      "name": "velocity",
+      "type": [
+        "null",
+        "double"
+      ],
+      "doc": "Object speed in m/s, if tracked",
+      "default": null
+    },
+    {
+      "name": "occlusion",
+      "type": [
+        "null",
+        "double"
+      ],
+      "doc": "Fraction of the object hidden from the camera, 0 to 1 (v2+)",
+      "default": null
+    }
+  ]
+}

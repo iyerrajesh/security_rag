@@ -26,6 +26,7 @@ the script, run `pip install -r simulator/requirements.txt` and then `python -m 
 | `--scenario-rate` | 1.0 | Multiplier on scenario injection rates |
 | `--faulty-share` | 0.3 | Fraction of the fleet starting on firmware 3.2 |
 | `--realtime` | off | Pace output to wall-clock time instead of running flat out |
+| `--bad-data-rate` | 0 | Fraction of events to corrupt on the wire, for testing validation (see [`bad_data.py`](bad_data.py)) |
 
 ## Output
 
@@ -41,6 +42,7 @@ One JSONL file per Kafka topic, plus ground truth and run metadata:
 | `scenarios.jsonl` | Ground-truth scenario episodes (not an event type) | — |
 | `manifest.json` | Run config and event counts | — |
 
+Perception events use schema **v2** (with `occlusion`) on perception stack 2.1.0, which ships with release 4.7, and **v1** on 2.0.3. A fleet mid-rollout sends both.
 Events are written in timestamp order. `scenarios.jsonl` is the answer key for
 scenario mining (Phase 7). Don't feed it into the pipeline. Episodes still
 active when the run ends are closed at the end time.

@@ -9,7 +9,7 @@ infrastructure/chaos/broker-pause.sh     # or one test at a time
 ```
 
 > **The scripts wipe local Kafka data.** Each test deletes and recreates the
-> `vehicle.*` topics so its counts aren't polluted by earlier runs. Kafka must
+> `vehicle.*`, `validated.vehicle.*` and `quarantine.vehicle` topics so its counts aren't polluted by earlier runs. Kafka must
 > be running (`docker compose --profile m1 up -d kafka`). The scripts create
 > `.venv/` if it's missing.
 

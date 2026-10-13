@@ -7,12 +7,21 @@ PARTITIONS="${PARTITIONS:-6}"
 RETENTION_MS="${RETENTION_MS:-604800000}"  # 7 days: enough to replay a week of data
 TOPICS_BIN=/opt/kafka/bin/kafka-topics.sh
 
-for topic in vehicle.telemetry vehicle.perception vehicle.planning vehicle.health vehicle.software; do
+QUARANTINE_RETENTION_MS="${QUARANTINE_RETENTION_MS:-2592000000}"  # 30 days: time to investigate bad data
+
+create() {  # create <topic> <retention.ms>
   "$TOPICS_BIN" --bootstrap-server "$BOOTSTRAP" --create --if-not-exists \
-    --topic "$topic" --partitions "$PARTITIONS" --replication-factor 1 \
-    --config retention.ms="$RETENTION_MS" \
+    --topic "$1" --partitions "$PARTITIONS" --replication-factor 1 \
+    --config retention.ms="$2" \
     --config cleanup.policy=delete \
     --config compression.type=producer
-done
+}
 
-"$TOPICS_BIN" --bootstrap-server "$BOOTSTRAP" --describe --topic 'vehicle\..*' | grep -v '^\s*Topic: .*Partition:'
+for type in telemetry perception planning health software; do
+  create "vehicle.$type" "$RETENTION_MS"            # raw JSON from the fleet (untrusted)
+  create "validated.vehicle.$type" "$RETENTION_MS"  # Avro, passed validation (Phase 4)
+done
+create quarantine.vehicle "$QUARANTINE_RETENTION_MS"  # rejected records + reason headers
+
+"$TOPICS_BIN" --bootstrap-server "$BOOTSTRAP" --describe --topic '(vehicle|validated|quarantine)\..*' \
+  | grep -v '^\s*Topic: .*Partition:'

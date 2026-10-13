@@ -21,13 +21,13 @@ setup() {
   dc up -d --wait kafka >/dev/null
 }
 
-# Delete and recreate the vehicle topics so each test starts from empty topics.
+# Delete and recreate the vehicle, validated and quarantine topics so each test starts empty.
 # This wipes local Kafka data (simulator output only).
 reset_topics() {
-  log "resetting vehicle.* topics"
-  kafka_bin kafka-topics.sh --delete --topic 'vehicle\..*' >/dev/null 2>&1 || true
+  log "resetting vehicle.*, validated.*, quarantine.* topics"
+  kafka_bin kafka-topics.sh --delete --topic '(vehicle|validated\.vehicle|quarantine)\..*' >/dev/null 2>&1 || true
   for _ in $(seq 1 30); do
-    [[ -z "$(kafka_bin kafka-topics.sh --list | grep '^vehicle\.' || true)" ]] && break
+    [[ -z "$(kafka_bin kafka-topics.sh --list | grep -E '^(vehicle|validated|quarantine)\.' || true)" ]] && break
     sleep 1
   done
   dc run --rm kafka-init >/dev/null

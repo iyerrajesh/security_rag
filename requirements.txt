@@ -1,0 +1,4 @@
+# Data platform (simulator, ingestion, validation). The RAG API has its own: app/requirements.txt
+-r simulator/requirements.txt
+-r validation/requirements.txt
+pytest>=8

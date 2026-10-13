@@ -12,7 +12,7 @@ Every event carries these fields (`schemas/base.py`):
 | Field | Type | Notes |
 |---|---|---|
 | `event_type` | string literal | `telemetry` \| `perception` \| `planning` \| `health` \| `software`. Selects the model when parsing. |
-| `schema_version` | int ≥ 1 | Version of this event type's schema. Currently `1` for all types. |
+| `schema_version` | int ≥ 1 | Version of this event type's schema. Perception is at `2`; every other type is at `1`. See *Versions*. |
 | `event_id` | UUID | Unique per event. Used for deduplication and idempotent writes. |
 | `vehicle_id` | string, `^V\d+$` | e.g. `V1023`. Kafka partition key and Iceberg bucket key. |
 | `timestamp` | timestamp, UTC | Event time. Must include a timezone; normalized to UTC. |
@@ -52,6 +52,7 @@ One event per detected object per report tick.
 | `x` | float | metres ahead of the vehicle |
 | `y` | float | metres to the left of the vehicle |
 | `velocity` | float, optional | object speed, m/s |
+| `occlusion` | float, optional, **v2+** | fraction of the object hidden from the camera, 0 – 1 |
 
 ### Planning → `vehicle.planning`
 
@@ -106,6 +107,24 @@ event = parse_event(raw_json)   # concrete model chosen by event_type; raises Va
 topic = topic_for(event)        # e.g. "vehicle.perception"
 ```
 
+## Versions and Avro
+
+Each event type is versioned with `schema_version`. A field added after v1 is
+marked `json_schema_extra=since(N)` and must be optional. Records are sent in
+their own version's shape: a v1 record omits v2 fields rather than sending them
+as null.
+
+| Event type | Versions | Changes |
+|---|---|---|
+| perception | 1, 2 | v2 adds optional `occlusion`. Perception stack 2.1.0+ sends v2 |
+| telemetry, planning, health, software | 1 | |
+
+`python -m schemas.avro` generates an Avro schema for every type and version
+into [`schemas/avro/`](../schemas/avro). The registry stores them under
+`validated.vehicle.<type>-value` with FULL compatibility. See
+[`validation/README.md`](../validation/README.md) for how records are checked
+against them.
+
 ## Ground truth (simulator only)
 
 The simulator also writes `scenarios.jsonl`: one record per injected scenario
@@ -120,7 +139,3 @@ answer key for evaluating scenario mining (Phase 7). See
   their effects (lower confidence, lower speed) and in the ground truth. The
   Phase 7 scenario record needs `weather`, so we must decide whether to infer it
   or add it to telemetry.
-- **Avro schemas.** These will be generated from the Pydantic models in Phase 4,
-  for the schema registry.
-- **Schema evolution.** The demo (Phase 4) will add `schema_version: 2` to one
-  type, such as an optional field on perception.

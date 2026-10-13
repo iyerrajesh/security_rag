@@ -45,7 +45,7 @@ Fleet simulator ──► Kafka ──► Validation / DQ ──┬──► Qua
 | Data model | `schemas/` Pydantic models | ✅ | Single source of truth; see [data-model.md](data-model.md) |
 | Generation | `simulator/` | ✅ | State-machine vehicles, 9 scenarios, planted failure chain, JSONL output |
 | Ingestion | Kafka (single-node KRaft) | ✅ broker, topics, producer; MinIO lander pending | See [ingestion/README.md](../ingestion/README.md) |
-| Data contracts | Validation + quarantine | Phase 4 | Avro schemas generated from Pydantic |
+| Data contracts | Schema Registry, validator, quarantine | ✅ (Iceberg quarantine table: Phase 5) | See [validation/README.md](../validation/README.md) |
 | Storage | MinIO + Iceberg (REST catalog) | Phase 5 | `raw` / `validated` / `curated` namespaces |
 | Analytics | Trino | Phase 6 | |
 | Streaming | PyFlink | Phase 9 | Batch scenario mining first |

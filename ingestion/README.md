@@ -23,6 +23,11 @@ RAG API deploy) never starts them. Use `127.0.0.1:9094` from the host and
 | `vehicle.planning` | `PlanningEvent` | 6 | 7 days |
 | `vehicle.health` | `HealthEvent` | 6 | 7 days |
 | `vehicle.software` | `SoftwareEvent` | 6 | 7 days |
+| `validated.vehicle.<type>` | Avro, after validation | 6 | 7 days |
+| `quarantine.vehicle` | Rejected raw records with reason headers | 6 | 30 days |
+
+The `validated.*` and `quarantine.vehicle` topics are written by the Phase 4
+validator ([`validation/`](../validation/README.md)).
 
 [`infrastructure/kafka/create-topics.sh`](../infrastructure/kafka/create-topics.sh)
 creates the topics and is safe to re-run. Auto-creation is turned off, so a typo
@@ -35,9 +40,10 @@ in a topic name fails loudly instead of quietly creating a new topic.
 | Key | `vehicle_id` (UTF-8) |
 | Value | Event JSON, exactly as serialized by the `schemas/` model |
 | Timestamp | The event's `timestamp` (event time, not send time) |
-| Header `schema_version` | Version of the event's schema |
 
-Phase 4 replaces the JSON values with Avro and a schema registry.
+Raw `vehicle.*` topics stay JSON on purpose. They stand in for untrusted edge
+input, which is where bad data comes from. The validator turns raw records into
+Avro on `validated.vehicle.*`, using the schema registry, or quarantines them.
 
 ## Design notes
 

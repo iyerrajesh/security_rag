@@ -18,6 +18,8 @@ BASELINE_RELEASE = Release("4.6", "2.0.3", "3.1", "D-4.6-GA")
 # cause the platform should later rediscover.
 FAULTY_RELEASE = Release("4.7", "2.1.0", "3.2", "D-4.7-ROLLOUT")
 INITIAL_FAULTY_SHARE = 0.3
+# Perception stacks at or above this version emit PerceptionEvent schema v2.
+PERCEPTION_V2_MIN_VERSION = (2, 1, 0)
 
 PHYSICS_DT = 0.1
 HEALTH_INTERVAL = 1.0
