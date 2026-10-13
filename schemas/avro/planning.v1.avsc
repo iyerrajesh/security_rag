@@ -1,0 +1,71 @@
+{
+  "type": "record",
+  "name": "PlanningEvent",
+  "namespace": "av.fleet",
+  "doc": "Planner decision (topic: vehicle.planning). Schema version 1.",
+  "fields": [
+    {
+      "name": "schema_version",
+      "type": "int",
+      "doc": "Schema version of this event type",
+      "default": 1
+    },
+    {
+      "name": "event_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Unique id used for deduplication"
+    },
+    {
+      "name": "vehicle_id",
+      "type": "string"
+    },
+    {
+      "name": "timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "Event time (timezone-aware, normalized to UTC)"
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "planning"
+    },
+    {
+      "name": "planned_action",
+      "type": {
+        "type": "enum",
+        "name": "PlannedAction",
+        "namespace": "av.fleet",
+        "symbols": [
+          "cruise",
+          "accelerate",
+          "decelerate",
+          "stop",
+          "yield",
+          "lane_change_left",
+          "lane_change_right",
+          "turn_left",
+          "turn_right"
+        ]
+      }
+    },
+    {
+      "name": "target_speed",
+      "type": "double",
+      "doc": "Target speed in m/s"
+    },
+    {
+      "name": "emergency_braking",
+      "type": "boolean"
+    },
+    {
+      "name": "trajectory_id",
+      "type": "string"
+    }
+  ]
+}

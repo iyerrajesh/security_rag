@@ -1,0 +1,55 @@
+{
+  "type": "record",
+  "name": "SoftwareEvent",
+  "namespace": "av.fleet",
+  "doc": "Software / firmware deployment on a vehicle (topic: vehicle.software). Schema version 1.",
+  "fields": [
+    {
+      "name": "schema_version",
+      "type": "int",
+      "doc": "Schema version of this event type",
+      "default": 1
+    },
+    {
+      "name": "event_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Unique id used for deduplication"
+    },
+    {
+      "name": "vehicle_id",
+      "type": "string"
+    },
+    {
+      "name": "timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "Event time (timezone-aware, normalized to UTC)"
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "software"
+    },
+    {
+      "name": "software_version",
+      "type": "string"
+    },
+    {
+      "name": "perception_version",
+      "type": "string"
+    },
+    {
+      "name": "firmware_version",
+      "type": "string"
+    },
+    {
+      "name": "deployment_id",
+      "type": "string"
+    }
+  ]
+}

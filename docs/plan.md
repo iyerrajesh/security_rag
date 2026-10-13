@@ -78,6 +78,7 @@ Decisions that follow:
 
 - [ ] Add MinIO and an Iceberg REST catalog to compose; write with PyIceberg.
 - [ ] Kafka → MinIO raw-event consumer (carried over from Phase 3).
+- [ ] `quarantine` Iceberg table fed from `quarantine.vehicle` (carried over from Phase 4).
 - [ ] Create `raw`, `validated`, `curated` namespaces.
 - [ ] Create tables: `raw_perception`, `validated_perception`, `vehicle_telemetry`,
       `vehicle_health`, `software_deployments`.
@@ -111,19 +112,22 @@ Trino query returns correlated perception, planning, and telemetry rows.
 
 ### Phase 4 — Schemas and data contracts
 
-- [ ] Choose Avro + a schema registry (Confluent or Apicurio). Avro fits Kafka tooling
+- [x] Choose Avro + a schema registry (Confluent or Apicurio). Avro fits Kafka tooling
       best, and the Pydantic models from Phase 1 can generate the Avro schemas.
-- [ ] Build `validation/` as a Kafka consumer that validates against the registry,
+- [x] Build `validation/` as a Kafka consumer that validates against the registry,
       dedups on `(vehicle_id, timestamp, event_type)`, and routes to
       `validated.*` or `quarantine.*` topics.
+      Dedup is on `event_id` instead: perception emits several objects per timestamp
+      (see `validation/README.md`).
 - [ ] Land quarantined records into a `quarantine` Iceberg table with a reason column.
-- [ ] Add a `--bad-data-rate` flag to the simulator that injects: missing fields,
+      **Deferred to Phase 5**, which adds Iceberg. The `quarantine.vehicle` topic exists now.
+- [x] Add a `--bad-data-rate` flag to the simulator that injects: missing fields,
       invalid confidence, unknown object types, duplicates, old schema versions,
       corrupt timestamps.
-- [ ] Emit quality metrics as Prometheus counters now (schema compliance, duplicate
+- [x] Emit quality metrics as Prometheus counters now (schema compliance, duplicate
       rate, invalid rate, late events, quarantined count) even though Grafana
       arrives in Milestone 5.
-- [ ] Ship `PerceptionEvent v2` with one added optional field and prove v1 consumers still work.
+- [x] Ship `PerceptionEvent v2` with one added optional field and prove v1 consumers still work.
 
 **Deliverables:** versioned schemas, validation service, quarantine topic/table,
 quality metrics, schema evolution example.

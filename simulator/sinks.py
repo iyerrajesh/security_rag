@@ -4,6 +4,7 @@ import gzip
 import io
 import json
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Protocol, TextIO
 
@@ -12,6 +13,8 @@ from schemas import BaseEvent
 
 class Sink(Protocol):
     def write(self, event: BaseEvent) -> None: ...
+    def write_raw(self, event_type: str, key: str, payload: str, timestamp: datetime) -> None:
+        """Write a payload as-is, without validation (used to inject bad data)."""
     def write_label(self, record: dict) -> None: ...
     def close(self) -> None: ...
 
@@ -37,7 +40,10 @@ class JsonlSink:
         return self._files[name]
 
     def write(self, event: BaseEvent) -> None:
-        self._file(event.event_type).write(event.model_dump_json() + "\n")
+        self._file(event.event_type).write(event.to_wire_json() + "\n")
+
+    def write_raw(self, event_type: str, key: str, payload: str, timestamp: datetime) -> None:
+        self._file(event_type).write(payload + "\n")
 
     def write_label(self, record: dict) -> None:
         self._file("scenarios").write(json.dumps(record) + "\n")
@@ -59,10 +65,14 @@ class MemorySink:
 
     def __init__(self):
         self.events: list[BaseEvent] = []
+        self.raw: list[tuple[str, str]] = []  # (event_type, payload) written with write_raw
         self.labels: list[dict] = []
 
     def write(self, event: BaseEvent) -> None:
         self.events.append(event)
+
+    def write_raw(self, event_type: str, key: str, payload: str, timestamp: datetime) -> None:
+        self.raw.append((event_type, payload))
 
     def write_label(self, record: dict) -> None:
         self.labels.append(record)
@@ -142,12 +152,14 @@ class KafkaSink:
             })
 
     def write(self, event: BaseEvent) -> None:
+        self.write_raw(event.event_type, event.vehicle_id, event.to_wire_json(), event.timestamp)
+
+    def write_raw(self, event_type: str, key: str, payload: str, timestamp: datetime) -> None:
         kwargs = dict(
-            topic=self._topics[event.event_type],
-            key=event.vehicle_id.encode(),
-            value=event.model_dump_json().encode(),
-            timestamp=int(event.timestamp.timestamp() * 1000),  # Kafka timestamp = event time
-            headers={"schema_version": str(event.schema_version)},
+            topic=self._topics[event_type],
+            key=key.encode(),
+            value=payload.encode(),
+            timestamp=int(timestamp.timestamp() * 1000),  # Kafka timestamp = event time
             on_delivery=self._on_delivery,
         )
         try:

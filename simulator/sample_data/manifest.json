@@ -4,27 +4,32 @@
     "events_per_second": 1.0,
     "duration": 60.0,
     "seed": 42,
+    "sink": "jsonl",
     "output": "simulator/sample_data",
     "compress": true,
+    "bootstrap_servers": "127.0.0.1:9094",
+    "producer_config": {},
     "start_time": "2026-10-04T10:00:00+00:00",
     "scenario_rate": 1.0,
     "faulty_share": 0.3,
-    "realtime": false
+    "realtime": false,
+    "bad_data_rate": 0.0
   },
   "counts": {
     "health": 6000,
-    "perception": 26854,
+    "perception": 27081,
     "planning": 6000,
-    "scenario:camera_degradation": 98,
-    "scenario:construction_zone": 18,
-    "scenario:hard_braking": 41,
-    "scenario:network_degradation": 16,
-    "scenario:night": 28,
-    "scenario:pedestrian_crossing": 123,
-    "scenario:rain": 22,
-    "scenario:sensor_failure": 4,
+    "scenario:camera_degradation": 102,
+    "scenario:construction_zone": 19,
+    "scenario:hard_braking": 44,
+    "scenario:network_degradation": 19,
+    "scenario:night": 30,
+    "scenario:pedestrian_crossing": 125,
+    "scenario:rain": 20,
+    "scenario:sensor_failure": 6,
     "scenario:software_deployment": 25,
     "software": 125,
     "telemetry": 6000
-  }
+  },
+  "elapsed_seconds": 2.15
 }

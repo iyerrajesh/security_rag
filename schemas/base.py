@@ -6,12 +6,22 @@ Kafka partitioning, Iceberg partitioning, and temporal correlation), plus
 """
 
 from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 
 VEHICLE_ID_PATTERN = r"^V\d+$"
 VERSION_PATTERN = r"^\d+(\.\d+){0,2}$"
+
+
+def since(version: int) -> dict[str, Any]:
+    """Mark a field as added in schema `version`: `Field(None, json_schema_extra=since(2))`.
+
+    Fields added after v1 must be optional, so older records stay valid
+    and the Avro schemas stay FULL-compatible.
+    """
+    return {"since": version}
 
 
 class BaseEvent(BaseModel):
@@ -28,3 +38,18 @@ class BaseEvent(BaseModel):
     @classmethod
     def _to_utc(cls, v: datetime) -> datetime:
         return v.astimezone(timezone.utc)
+
+    @classmethod
+    def latest_version(cls) -> int:
+        return cls.model_fields["schema_version"].default
+
+    @classmethod
+    def fields_for_version(cls, version: int) -> list[str]:
+        """Field names that exist in schema `version` of this event type."""
+        return [name for name, f in cls.model_fields.items()
+                if (f.json_schema_extra or {}).get("since", 1) <= version]
+
+    def to_wire_json(self) -> str:
+        """JSON for this event's own `schema_version`: fields added later are omitted, not null."""
+        keep = set(self.fields_for_version(self.schema_version))
+        return self.model_dump_json(exclude={name for name in type(self).model_fields if name not in keep})

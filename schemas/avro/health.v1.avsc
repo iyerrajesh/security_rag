@@ -1,0 +1,77 @@
+{
+  "type": "record",
+  "name": "HealthEvent",
+  "namespace": "av.fleet",
+  "doc": "Compute and sensor health (topic: vehicle.health). Schema version 1.",
+  "fields": [
+    {
+      "name": "schema_version",
+      "type": "int",
+      "doc": "Schema version of this event type",
+      "default": 1
+    },
+    {
+      "name": "event_id",
+      "type": {
+        "type": "string",
+        "logicalType": "uuid"
+      },
+      "doc": "Unique id used for deduplication"
+    },
+    {
+      "name": "vehicle_id",
+      "type": "string"
+    },
+    {
+      "name": "timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "Event time (timezone-aware, normalized to UTC)"
+    },
+    {
+      "name": "event_type",
+      "type": "string",
+      "default": "health"
+    },
+    {
+      "name": "cpu",
+      "type": "double",
+      "doc": "CPU utilization, percent"
+    },
+    {
+      "name": "memory",
+      "type": "double",
+      "doc": "Memory utilization, percent"
+    },
+    {
+      "name": "gpu",
+      "type": "double",
+      "doc": "GPU utilization, percent"
+    },
+    {
+      "name": "camera_status",
+      "type": {
+        "type": "enum",
+        "name": "SensorStatus",
+        "namespace": "av.fleet",
+        "symbols": [
+          "ok",
+          "degraded",
+          "failed",
+          "offline"
+        ]
+      }
+    },
+    {
+      "name": "lidar_status",
+      "type": "av.fleet.SensorStatus"
+    },
+    {
+      "name": "network_latency",
+      "type": "double",
+      "doc": "Network round-trip latency in ms"
+    }
+  ]
+}

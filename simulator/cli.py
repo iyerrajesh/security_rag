@@ -7,6 +7,7 @@ from pathlib import Path
 
 from . import config as C
 from .engine import DEFAULT_START, SimulationConfig, run
+from .bad_data import BadDataSink
 from .sinks import JsonlSink, KafkaSink
 
 
@@ -54,6 +55,8 @@ def main(argv=None) -> None:
     p.add_argument("--faulty-share", type=float, default=C.INITIAL_FAULTY_SHARE,
                    help="fraction of the fleet starting on firmware 3.2")
     p.add_argument("--realtime", action="store_true", help="pace output to wall-clock time")
+    p.add_argument("--bad-data-rate", type=float, default=0.0,
+                   help="fraction of events to corrupt, 0-1 (see simulator/bad_data.py)")
     args = p.parse_args(argv)
     if args.start_time is None:
         args.start_time = (datetime.now(timezone.utc).replace(microsecond=0) if args.sink == "kafka"
@@ -69,12 +72,13 @@ def main(argv=None) -> None:
         sink = KafkaSink(args.bootstrap_servers, args.output, **dict(args.producer_config))
     else:
         sink = JsonlSink(args.output, compress=args.compress)
+    outer = BadDataSink(sink, args.bad_data_rate, args.seed) if args.bad_data_rate > 0 else sink
     error = None
     try:
-        counts = run(cfg, sink)
+        counts = run(cfg, outer)
     finally:
         try:
-            sink.close()
+            outer.close()
         except RuntimeError as exc:  # delivery failures: still write the manifest, then fail
             error = exc
     elapsed = time.monotonic() - started
@@ -87,6 +91,8 @@ def main(argv=None) -> None:
     }
     if isinstance(sink, KafkaSink):
         manifest["kafka"] = sink.stats()
+    if isinstance(outer, BadDataSink):
+        manifest["bad_data"] = {"rate": args.bad_data_rate, "injected": dict(sorted(outer.injected.items()))}
     (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
     events = sum(n for k, n in counts.items() if not k.startswith("scenario:"))
@@ -99,6 +105,8 @@ def main(argv=None) -> None:
         print(f"  kafka: delivered={k['delivered']:,} failed={k['failed']:,} queue_full={k['queue_full']:,} "
               f"blocked={k['blocked_seconds']}s max_queue={k['max_queue_depth']:,} "
               f"max_throttle={k['max_broker_throttle_ms']}ms", file=sys.stderr)
+    if isinstance(outer, BadDataSink):
+        print(f"  bad data injected: {dict(sorted(outer.injected.items()))}", file=sys.stderr)
     if error:
         print(f"error: {error}", file=sys.stderr)
         sys.exit(1)

@@ -9,7 +9,7 @@ cd "$ROOT"
 
 PYTHON="${PYTHON:-python3}"
 VENV_DIR="${VENV_DIR:-.venv}"
-REQUIREMENTS="simulator/requirements.txt"
+REQUIREMENTS="requirements.txt"
 
 if [[ ! -x "$VENV_DIR/bin/python" ]]; then
   echo "Creating virtualenv in $VENV_DIR" >&2
@@ -17,12 +17,12 @@ if [[ ! -x "$VENV_DIR/bin/python" ]]; then
 fi
 
 # Reinstall only when requirements change.
-STAMP="$VENV_DIR/.simulator-requirements"
-if ! cmp -s "$REQUIREMENTS" "$STAMP"; then
+STAMP="$VENV_DIR/.platform-requirements"
+if ! cat requirements.txt simulator/requirements.txt validation/requirements.txt | cmp -s - "$STAMP"; then
   echo "Installing $REQUIREMENTS" >&2
   "$VENV_DIR/bin/python" -m pip install --quiet --upgrade pip
   "$VENV_DIR/bin/python" -m pip install --quiet -r "$REQUIREMENTS"
-  cp "$REQUIREMENTS" "$STAMP"
+  cat requirements.txt simulator/requirements.txt validation/requirements.txt > "$STAMP"
 fi
 
 exec "$VENV_DIR/bin/python" -m simulator "$@"

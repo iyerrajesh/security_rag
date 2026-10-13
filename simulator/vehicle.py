@@ -32,6 +32,10 @@ from schemas import (
 from . import config as C
 from .scenarios import SPECS, Episode, Scenario
 
+def _version_tuple(version: str) -> tuple[int, ...]:
+    return tuple(int(part) for part in version.split("."))
+
+
 OBJECT_ID_PREFIX = {
     ObjectType.PEDESTRIAN: "P",
     ObjectType.VEHICLE: "OV",
@@ -435,8 +439,13 @@ class Vehicle:
         )
 
     def _perception_event(self, t: float, d: Detection) -> PerceptionEvent:
+        # Perception stack 2.1.0+ emits schema v2, which adds occlusion; older stacks emit v1.
+        v2 = _version_tuple(self.release.perception_version) >= C.PERCEPTION_V2_MIN_VERSION
+        extra = {"schema_version": 2, "occlusion": round(self.rng.betavariate(1.5, 6.0), 3)} if v2 \
+            else {"schema_version": 1}
         return PerceptionEvent(
             **self._common(t),
+            **extra,
             object_id=d.obj.object_id,
             object_type=d.object_type,
             confidence=round(d.confidence, 3),
