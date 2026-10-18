@@ -1,0 +1,22 @@
+{
+  "folders": {},
+  "connections": {
+    "trino-lakehouse": {
+      "provider": "generic",
+      "driver": "trino_jdbc",
+      "name": "Lakehouse (Trino)",
+      "save-password": true,
+      "configuration": {
+        "host": "trino",
+        "port": "8080",
+        "database": "lakehouse",
+        "url": "jdbc:trino://trino:8080/lakehouse",
+        "type": "dev",
+        "auth-model": "native",
+        "user": "lakehouse",
+        "password": ""
+      },
+      "custom-properties": {}
+    }
+  }
+}
