@@ -3,8 +3,9 @@
 Layers (Iceberg namespaces):
 
   raw         every message of `vehicle.<type>` as received: untrusted bytes + Kafka coordinates
-  validated   typed events from `validated.vehicle.<type>` (perception and planning, event grain)
-  curated     typed events for the analytics tables (telemetry, health, software deployments)
+  validated   typed events from `validated.vehicle.<type>`: passed the contract, but may hold repeats
+              (the validator's dedup state is in memory, so a restart can emit an event twice)
+  curated     validated events with repeats removed: what analytics queries should read
   quarantine  records the validator rejected, original bytes plus the reason
 
 The typed schemas come from `schemas/`, so a field added to a Pydantic model shows up
@@ -48,11 +49,12 @@ TABLE_PROPERTIES = {
 
 MODELS: dict[str, type[BaseEvent]] = {event_type_of(m): m for m in TOPICS}
 
-# Where each validated topic lands. Perception and planning are event-grain data that Phase 6
-# joins, so they stay in `validated`; the rest are analytics-ready as they are.
-VALIDATED_TABLES = {
-    "perception": (VALIDATED, "validated_perception"),
-    "planning": (VALIDATED, "validated_planning"),
+VALIDATED_TABLES = {event_type: (VALIDATED, f"validated_{event_type}") for event_type in MODELS}
+
+# Curated tables keep the analytics names from the plan; perception and planning follow the same pattern.
+CURATED_TABLES = {
+    "perception": (CURATED, "vehicle_perception"),
+    "planning": (CURATED, "vehicle_planning"),
     "telemetry": (CURATED, "vehicle_telemetry"),
     "health": (CURATED, "vehicle_health"),
     "software": (CURATED, "software_deployments"),
@@ -63,10 +65,11 @@ VALIDATED_TABLES = {
 class TableDef:
     namespace: str
     name: str
-    kind: str  # "raw" | "validated" | "quarantine"
-    topic: str  # the Kafka topic that feeds this table
+    kind: str  # "raw" | "validated" | "curated" | "quarantine"
+    topic: Optional[str]  # the Kafka topic that feeds this table (None for curated)
     schema: Schema
     event_type: Optional[str] = None
+    source: Optional[str] = None  # the table a curated table is built from
 
     @property
     def identifier(self) -> str:
@@ -121,6 +124,13 @@ def validated_schema(model: type[BaseEvent]) -> Schema:
     return _schema(columns)
 
 
+def curated_schema(model: type[BaseEvent]) -> Schema:
+    """The validated columns plus when the row was curated. Field ids match the validated table's."""
+    columns = [(f.name, f.field_type, f.required) for f in validated_schema(model).fields]
+    columns.append(("curated_time", TimestamptzType(), True))
+    return _schema(columns)
+
+
 def raw_schema() -> Schema:
     """`timestamp` is the Kafka record timestamp, which the simulator sets to the event time."""
     return _schema([
@@ -157,6 +167,9 @@ def all_tables() -> list[TableDef]:
     for event_type, (namespace, name) in VALIDATED_TABLES.items():
         tables.append(TableDef(namespace, name, "validated", validated_topic(event_type),
                                validated_schema(MODELS[event_type]), event_type))
+    for event_type, (namespace, name) in CURATED_TABLES.items():
+        source = ".".join(VALIDATED_TABLES[event_type])
+        tables.append(TableDef(namespace, name, "curated", None, curated_schema(MODELS[event_type]), event_type, source))
     tables.append(TableDef(QUARANTINE, "vehicle", "quarantine", QUARANTINE_TOPIC, quarantine_schema()))
     return tables
 

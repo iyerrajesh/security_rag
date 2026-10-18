@@ -4,15 +4,15 @@ They use a local SQL catalog with a filesystem warehouse, so no containers are n
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from lakehouse import rows
+from lakehouse import curate, demos, maintenance, rows
 from lakehouse.bootstrap import ensure_tables
 from lakehouse.catalog import get_catalog
 from lakehouse.sink import TableWriter, committed_offsets, offset_property
-from lakehouse.tables import MODELS, NAMESPACES, VALIDATED_TABLES, all_tables, tables_of
+from lakehouse.tables import MODELS, NAMESPACES, all_tables, tables_of
 
 NOW = datetime(2026, 10, 4, 10, 30, 20, tzinfo=timezone.utc)
 EVENT_TIME = datetime(2026, 10, 4, 10, 30, 15, tzinfo=timezone.utc)
@@ -81,6 +81,13 @@ def test_bootstrap_reset_recreates_empty_tables(catalog):
     assert writer.table.scan().to_arrow().num_rows == 1
     assert set(ensure_tables(catalog, reset=True).values()) == {"recreated"}
     assert catalog.load_table("validated.validated_perception").scan().to_arrow().num_rows == 0
+
+
+def test_layers_are_built_from_the_models():
+    kinds = {t.kind: [x for x in all_tables() if x.kind == t.kind] for t in all_tables()}
+    assert {k: len(v) for k, v in kinds.items()} == {"raw": 5, "validated": 5, "curated": 5, "quarantine": 1}
+    for table in kinds["curated"]:
+        assert table.topic is None and table.source in {t.identifier for t in kinds["validated"]}
 
 
 def test_validated_row_maps_types():
@@ -195,3 +202,167 @@ def test_rows_are_spread_over_vehicle_buckets(catalog):
     writer.flush()
     files = catalog.load_table("validated.validated_perception").inspect.files().to_pylist()
     assert 1 < len(files) <= 8  # one day, up to 8 buckets
+
+
+def land(catalog, identifier: str, records: list[dict], first_offset: int = 0, partition: int = 0) -> None:
+    """Write validated rows to a validated table, one commit per call."""
+    writer = writer_for(catalog, identifier)
+    for i, record in enumerate(records):
+        offset = first_offset + i
+        writer.add(rows.validated_row(record, "perception", partition=partition, offset=offset, late=False,
+                                      now=NOW + timedelta(seconds=offset)), partition, offset)
+    writer.flush()
+
+
+def curated_ids(catalog) -> list[str]:
+    return catalog.load_table("curated.vehicle_perception").scan(selected_fields=("event_id",)).to_arrow()["event_id"].to_pylist()
+
+
+def curate_perception(catalog) -> dict:
+    target = next(t for t in tables_of("curated") if t.event_type == "perception")
+    return curate.curate_table(catalog, target, now=NOW)
+
+
+def test_curate_copies_new_rows_and_adds_curated_time(catalog):
+    land(catalog, "validated.validated_perception", [perception_record() for _ in range(5)])
+    assert curate_perception(catalog) == {"read": 5, "written": 5, "repeats": 0}
+    out = catalog.load_table("curated.vehicle_perception").scan().to_arrow().to_pylist()
+    assert len(out) == 5 and all(r["curated_time"] == NOW for r in out)
+
+
+def test_curate_is_incremental(catalog):
+    land(catalog, "validated.validated_perception", [perception_record() for _ in range(3)])
+    curate_perception(catalog)
+    assert curate_perception(catalog) == {"read": 0, "written": 0, "repeats": 0}  # nothing new
+    land(catalog, "validated.validated_perception", [perception_record() for _ in range(2)], first_offset=3)
+    assert curate_perception(catalog) == {"read": 2, "written": 2, "repeats": 0}  # only the new rows
+    assert len(curated_ids(catalog)) == 5
+
+
+def test_curate_drops_a_repeat_within_a_batch_and_across_runs(catalog):
+    event_id = uuid.uuid4()
+    # the sink dedupes within a commit, so a repeat reaches the table as a second commit
+    land(catalog, "validated.validated_perception", [perception_record(event_id=event_id), perception_record()])
+    land(catalog, "validated.validated_perception", [perception_record(event_id=event_id)], first_offset=5)
+    assert curate_perception(catalog) == {"read": 3, "written": 2, "repeats": 1}
+    # the validator re-emits the same event later (its dedup state was lost): it must not be curated again
+    land(catalog, "validated.validated_perception", [perception_record(event_id=event_id)], first_offset=10)
+    assert curate_perception(catalog) == {"read": 1, "written": 0, "repeats": 1}
+    ids = curated_ids(catalog)
+    assert len(ids) == len(set(ids)) == 2
+
+
+def test_curate_keeps_the_first_copy(catalog):
+    event_id = uuid.uuid4()
+    land(catalog, "validated.validated_perception", [perception_record(event_id=event_id, confidence=0.1)])
+    land(catalog, "validated.validated_perception", [perception_record(event_id=event_id, confidence=0.9)], first_offset=1)
+    curate_perception(catalog)
+    (row,) = catalog.load_table("curated.vehicle_perception").scan().to_arrow().to_pylist()
+    assert row["confidence"] == 0.1 and row["kafka_offset"] == 0
+
+
+def small_file_table(catalog, commits: int = 6, per_commit: int = 40):
+    for c in range(commits):
+        land(catalog, "validated.validated_perception",
+             [perception_record(vehicle_id=f"V{i}") for i in range(per_commit)], first_offset=c * per_commit)
+    return catalog.load_table("validated.validated_perception")
+
+
+def test_compaction_merges_small_files_without_changing_the_data(catalog):
+    before = small_file_table(catalog)
+    files_before = len(before.inspect.data_files())
+    ids_before = sorted(before.scan(selected_fields=("event_id",)).to_arrow()["event_id"].to_pylist())
+
+    result = maintenance.compact(catalog, "validated.validated_perception", min_files=2)
+
+    after = catalog.load_table("validated.validated_perception")
+    assert result.files_before == files_before and result.files_after == len(after.inspect.data_files())
+    assert result.files_after < files_before / 2
+    assert sorted(after.scan(selected_fields=("event_id",)).to_arrow()["event_id"].to_pylist()) == ids_before
+    assert after.current_snapshot().summary.additional_properties["lakehouse.sink"] == "compact"
+
+
+def test_compaction_keeps_the_kafka_offsets(catalog):
+    small_file_table(catalog)
+    before = committed_offsets(catalog.load_table("validated.validated_perception"), "validated.vehicle.perception")
+    maintenance.compact(catalog, "validated.validated_perception", min_files=2)
+    assert committed_offsets(catalog.load_table("validated.validated_perception"), "validated.vehicle.perception") == before
+
+
+def test_compaction_leaves_a_partition_with_too_few_files_alone(catalog):
+    small_file_table(catalog, commits=2, per_commit=3)
+    result = maintenance.compact(catalog, "validated.validated_perception", min_files=50)
+    assert result.partitions == 0 and result.files_after == result.files_before
+
+
+def test_a_sink_can_keep_writing_after_a_compaction(catalog):
+    writer = writer_for(catalog, "validated.validated_perception")
+    small_file_table(catalog)
+    maintenance.compact(catalog, "validated.validated_perception", min_files=2)
+    # this writer loaded its table before the compaction: its next commit must still land
+    writer.add(rows.validated_row(perception_record(), "perception", partition=0, offset=999, late=False, now=NOW), 0, 999)
+    writer.flush()
+    assert catalog.load_table("validated.validated_perception").scan().to_arrow().num_rows == 241
+
+
+def test_compacting_an_empty_table_is_a_no_op(catalog):
+    assert maintenance.compact(catalog, "validated.validated_perception").partitions == 0
+
+
+def test_expire_keeps_the_newest_snapshot_and_time_travel_ends(catalog):
+    table = small_file_table(catalog, commits=4)
+    first = table.snapshots()[0].snapshot_id
+    expired = maintenance.expire_snapshots(table, datetime.now(timezone.utc) + timedelta(minutes=1), retain_last=1)
+    table = catalog.load_table("validated.validated_perception")
+    assert len(expired) == 3 and len(table.snapshots()) == 1
+    assert table.scan().to_arrow().num_rows == 160
+    with pytest.raises((ValueError, KeyError)):
+        table.scan(snapshot_id=first).to_arrow()
+
+
+def test_orphans_are_only_removed_after_their_snapshots_expire(catalog):
+    small_file_table(catalog)
+    maintenance.compact(catalog, "validated.validated_perception", min_files=2)
+    table = catalog.load_table("validated.validated_perception")
+    future = datetime.now(timezone.utc) + timedelta(minutes=1)
+    assert maintenance.remove_orphans(table, future, dry_run=True) == []  # old snapshots still reference everything
+
+    maintenance.expire_snapshots(table, future, retain_last=1)
+    table = catalog.load_table("validated.validated_perception")
+    orphans = maintenance.remove_orphans(table, future)
+    assert orphans and table.scan().to_arrow().num_rows == 240
+    assert maintenance.remove_orphans(table, future) == []
+    assert not any(maintenance._strip(p) in set(orphans) for p in table.inspect.all_files()["file_path"].to_pylist())
+
+
+def test_orphans_younger_than_the_cutoff_are_kept(catalog):
+    small_file_table(catalog)
+    maintenance.compact(catalog, "validated.validated_perception", min_files=2)
+    table = catalog.load_table("validated.validated_perception")
+    maintenance.expire_snapshots(table, datetime.now(timezone.utc) + timedelta(minutes=1), retain_last=1)
+    table = catalog.load_table("validated.validated_perception")
+    assert maintenance.remove_orphans(table, datetime.now(timezone.utc) - timedelta(hours=1)) == []  # a writer may still commit them
+
+
+def test_parse_age():
+    assert maintenance.parse_age("90s") == timedelta(seconds=90) and maintenance.parse_age("2h") == timedelta(hours=2)
+    assert maintenance.parse_age("0s") == timedelta(0) and maintenance.parse_age("30") == timedelta(seconds=30)
+
+
+def test_demo_schema_evolution(catalog):
+    facts = demos.evolve(catalog)
+    assert facts["nulls_after_add"] == 1000 and facts["null_occlusion_mixed"] == 1000
+    assert facts["velocity_sum_unchanged"] and facts["rows_final"] == 2000 and len(facts["spec_ids"]) == 2
+
+
+def test_demo_time_travel(catalog):
+    facts = demos.timetravel(catalog)
+    assert facts["counts"] == [300, 500, 600] and facts["as_of_time"] == 500
+    assert facts["rows_now"] == facts["rows_old_snapshot"] == 600 and facts["files_after"] < facts["files_before"]
+
+
+def test_demo_retention(catalog):
+    facts = demos.retention(catalog)
+    assert facts["snapshots_before"] == 11 and facts["snapshots_after"] == 1 and facts["rows_after"] == 500
+    assert facts["objects_expired"] >= facts["objects_before"] and facts["objects_after"] < facts["objects_before"] / 2
+    assert facts["time_travel"].startswith("gone")

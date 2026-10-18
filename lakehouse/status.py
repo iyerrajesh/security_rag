@@ -21,7 +21,7 @@ def table_stats(catalog: Catalog) -> list[dict]:
             "data_files": int(summary.get("total-data-files", 0)),
             "bytes": int(summary.get("total-files-size", 0)),
             "snapshots": len(table.snapshots()),
-            "offsets": committed_offsets(table, definition.topic),
+            "offsets": committed_offsets(table, definition.topic) if definition.topic else {},
         })
     return stats
 

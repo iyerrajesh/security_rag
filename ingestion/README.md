@@ -70,8 +70,8 @@ therefore use event time with windows, never arrival order.
 
 ### Consumer groups
 
-Each downstream job uses its own group. Examples are the raw-to-MinIO lander,
-the Phase 4 validator, and the Phase 9 Flink jobs. Each group reads the full
+Each downstream job uses its own group. Examples are the lakehouse sinks (`lakehouse-raw`,
+`lakehouse-validated`, `lakehouse-quarantine`), the Phase 4 validator, and the Phase 9 Flink jobs. Each group reads the full
 stream independently and tracks its own offsets. Within a group, partitions are
 divided among its consumers. The `ingestion.consume` verifier uses a new random
 group each time, so it never moves offsets for real consumers.
@@ -137,4 +137,5 @@ timeout, bounded queue, broker throttling, slow consumer, and consumer crash/res
 - [x] Producer sink (`simulator --sink kafka`) and verifier consumer (`ingestion.consume`)
 - [x] Throughput benchmark at 100 and 1,000 vehicles in [`architecture/benchmarks.md`](../architecture/benchmarks.md)
 - [x] Backpressure and failure tests in [`infrastructure/chaos/`](../infrastructure/chaos/README.md)
-- [ ] Consumer that lands raw events in MinIO. **Moved to Phase 5**, which adds MinIO.
+- [x] Consumer that lands raw events in MinIO. Done in Phase 5: `python -m lakehouse sink raw` writes
+      `raw.raw_<type>` Iceberg tables (see [`lakehouse/README.md`](../lakehouse/README.md)).

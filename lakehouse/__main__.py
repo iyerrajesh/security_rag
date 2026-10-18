@@ -1,11 +1,16 @@
-"""    python -m lakehouse bootstrap [--reset]   create namespaces and tables
+"""    python -m lakehouse bootstrap [--reset]      create namespaces and tables
     python -m lakehouse sink raw|validated|quarantine [...]
-    python -m lakehouse status                  rows, files and snapshots per table
+    python -m lakehouse curate [TYPE ...]        validated -> curated (drops repeats)
+    python -m lakehouse status                   rows, files and snapshots per table
+    python -m lakehouse compact [TABLE ...] [--benchmark]
+    python -m lakehouse expire|orphans [TABLE ...] --older-than 1h
+    python -m lakehouse demo evolve|timetravel|retention|all
+    python -m lakehouse facts --output facts.json    contents summary, read by e2e.sh
 """
 
 import sys
 
-COMMANDS = ("bootstrap", "sink", "status")
+COMMANDS = ("bootstrap", "sink", "curate", "status", "compact", "expire", "orphans", "demo", "facts")
 
 
 def main(argv: list[str]) -> int:
@@ -22,6 +27,18 @@ def main(argv: list[str]) -> int:
     if command == "bootstrap":
         from lakehouse import bootstrap
         return bootstrap.main(rest, catalog)
+    if command == "curate":
+        from lakehouse import curate
+        return curate.main(rest, catalog)
+    if command in ("compact", "expire", "orphans"):
+        from lakehouse import maintenance
+        return maintenance.main(command, rest, catalog)
+    if command == "demo":
+        from lakehouse import demos
+        return demos.main(rest, catalog)
+    if command == "facts":
+        from lakehouse import facts
+        return facts.main(rest, catalog)
     from lakehouse import status
     return status.main(catalog)
 
