@@ -18,11 +18,11 @@ fi
 
 # Reinstall only when requirements change.
 STAMP="$VENV_DIR/.platform-requirements"
-if ! cat requirements.txt simulator/requirements.txt validation/requirements.txt | cmp -s - "$STAMP"; then
+if ! cat requirements.txt simulator/requirements.txt validation/requirements.txt lakehouse/requirements.txt | cmp -s - "$STAMP"; then
   echo "Installing $REQUIREMENTS" >&2
   "$VENV_DIR/bin/python" -m pip install --quiet --upgrade pip
   "$VENV_DIR/bin/python" -m pip install --quiet -r "$REQUIREMENTS"
-  cat requirements.txt simulator/requirements.txt validation/requirements.txt > "$STAMP"
+  cat requirements.txt simulator/requirements.txt validation/requirements.txt lakehouse/requirements.txt > "$STAMP"
 fi
 
 exec "$VENV_DIR/bin/python" -m simulator "$@"
