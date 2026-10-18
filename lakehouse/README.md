@@ -1,7 +1,8 @@
 # Lakehouse (Phase 5)
 
 Kafka -> Iceberg tables on MinIO, through an Iceberg REST catalog. Writers, layers, compaction,
-snapshot retention and the Iceberg feature demos are in place. Trino arrives in Phase 6.
+snapshot retention and the Iceberg feature demos are in place. Trino (Phase 6) queries the tables: see
+[`query-design.md`](query-design.md).
 
 ```
 docker compose --profile m1 up -d --wait kafka kafka-init schema-registry minio iceberg-rest
@@ -23,8 +24,11 @@ docker compose --profile m1 up -d --wait kafka kafka-init schema-registry minio 
 | `orphans [TABLE ...] --older-than 1h [--dry-run]` | Delete files no snapshot references |
 | `demo evolve\|timetravel\|retention\|all` | Iceberg features on scratch tables in the `demo` namespace |
 | `status`, `facts` | Counts from metadata; contents summary used by the end-to-end test |
+| `query [NAME]`, `sql "..."` | Run a saved query (`queries/NAME.sql`) or any SQL on Trino |
+| `backfill DIR ... [--namespace bench]` | Load simulator JSONL runs into curated-shaped tables (multi-day benchmark data) |
 
-Consoles: MinIO http://127.0.0.1:9001 (`minioadmin` / `minioadmin`), catalog http://127.0.0.1:8181.
+Consoles: MinIO http://127.0.0.1:9001 (`minioadmin` / `minioadmin`), catalog http://127.0.0.1:8181, Trino
+http://127.0.0.1:8082 (monitoring only), CloudBeaver SQL editor http://127.0.0.1:8978 (`cbadmin` / `Lakehouse1`).
 Settings come from `LAKEHOUSE_*`, `MINIO_ROOT_*`, `KAFKA_BOOTSTRAP_SERVERS` and `SCHEMA_REGISTRY_URL` (see `config.py`).
 Prometheus metrics: sinks serve `lakehouse_rows_written_total`, `lakehouse_commits_total`,
 `lakehouse_commit_seconds`, `lakehouse_decode_errors_total` and `lakehouse_duplicate_rows_total`
@@ -131,6 +135,8 @@ about 850 files became 8 and queries ran 5 to 31 times faster.
 .venv/bin/python -m pytest tests/test_lakehouse.py     # no containers: local SQL catalog + filesystem warehouse
 lakehouse/e2e.sh                                       # full stack: 13 checks, see below
 lakehouse/smallfiles.sh                                # the compaction experiment, 4 checks
+lakehouse/trino_bench.sh                               # Trino pruning, join and pre-aggregation benchmarks
+lakehouse/milestone1.sh                                # Milestone 1 exit check: 10 simulated minutes -> Trino, 6 checks
 ```
 
 `e2e.sh` runs the simulator with 5% bad data, then checks that: raw holds every produced record; validated holds

@@ -15,12 +15,13 @@ from lakehouse.tables import NAMESPACES, TABLE_PROPERTIES, TableDef, all_tables
 def ensure_tables(catalog: Catalog, tables: list[TableDef] = None, reset: bool = False) -> dict[str, str]:
     """Returns {identifier: "created" | "exists" | "recreated" | "drifted"}."""
     outcome = {}
-    for namespace in NAMESPACES:
+    tables = tables or all_tables()
+    for namespace in dict.fromkeys([*NAMESPACES, *(t.namespace for t in tables)]):
         try:
             catalog.create_namespace(namespace)
         except NamespaceAlreadyExistsError:
             pass
-    for table in tables or all_tables():
+    for table in tables:
         existed = False
         try:
             existing = catalog.load_table(table.identifier)

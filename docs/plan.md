@@ -99,17 +99,24 @@ All in `lakehouse/`; benchmark in `architecture/benchmarks.md`; end-to-end test 
 
 ### Phase 6 — Trino analytics (Week 4)
 
-- [ ] Add Trino with the Iceberg connector.
-- [ ] Write the failure-rate-by-software-version query.
-- [ ] Write the pedestrian-detection-failure query joining perception, planning,
+- [x] Add Trino with the Iceberg connector.
+      Trino 476 in `docker-compose.yml` (profile `m1`, port 8082), config in `infrastructure/trino/etc/`.
+- [x] Write the failure-rate-by-software-version query.
+      `lakehouse/queries/failure_rate_by_version.sql`, with an as-of join to `software_deployments`.
+- [x] Write the pedestrian-detection-failure query joining perception, planning,
       and telemetry on `vehicle_id` + time window.
-- [ ] Benchmark partition pruning and Parquet column pruning with `EXPLAIN ANALYZE`.
-- [ ] Document lakehouse query design.
+      `pedestrian_detection_failures.sql`; `correlated_events.sql` is the exit query.
+- [x] Benchmark partition pruning and Parquet column pruning with `EXPLAIN ANALYZE`.
+      Plus temporal joins, pre-aggregation and query latency, in `architecture/benchmarks.md`. Finding: Trino reads
+      Parquet files under 3 MB whole, so column pruning saves no I/O on small files.
+- [x] Document lakehouse query design. `lakehouse/query-design.md`.
 
 **Deliverables:** Trino deployment, analytics queries, query benchmarks, query-design doc.
+Run `lakehouse/trino_bench.sh` for the benchmarks and `lakehouse/milestone1.sh` for the exit check.
 
 **Milestone 1 exit criteria:** one command runs the simulator for 10 minutes and a
 Trino query returns correlated perception, planning, and telemetry rows.
+**Met:** `lakehouse/milestone1.sh` (6 checks pass).
 
 ---
 

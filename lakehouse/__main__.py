@@ -6,11 +6,14 @@
     python -m lakehouse expire|orphans [TABLE ...] --older-than 1h
     python -m lakehouse demo evolve|timetravel|retention|all
     python -m lakehouse facts --output facts.json    contents summary, read by e2e.sh
+    python -m lakehouse backfill DIR ... [--namespace bench]   load simulator JSONL runs (benchmark data)
+    python -m lakehouse query [NAME]             run a saved Trino query (lakehouse/queries/NAME.sql)
+    python -m lakehouse sql "SELECT ..."         run SQL on Trino
 """
 
 import sys
 
-COMMANDS = ("bootstrap", "sink", "curate", "status", "compact", "expire", "orphans", "demo", "facts")
+COMMANDS = ("bootstrap", "sink", "curate", "status", "compact", "expire", "orphans", "demo", "facts", "query", "sql", "backfill")
 
 
 def main(argv: list[str]) -> int:
@@ -21,6 +24,10 @@ def main(argv: list[str]) -> int:
     if command == "sink":
         from lakehouse import sink
         return sink.main(rest)
+
+    if command in ("query", "sql"):
+        from lakehouse import trino
+        return trino.main(command, rest)
 
     from lakehouse.catalog import get_catalog
     catalog = get_catalog()
@@ -36,6 +43,9 @@ def main(argv: list[str]) -> int:
     if command == "demo":
         from lakehouse import demos
         return demos.main(rest, catalog)
+    if command == "backfill":
+        from lakehouse import backfill
+        return backfill.main(rest, catalog)
     if command == "facts":
         from lakehouse import facts
         return facts.main(rest, catalog)

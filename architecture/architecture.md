@@ -19,7 +19,7 @@ flowchart TD
     QUAR -->|"✅ sink quarantine"| ICE
     VTOP -->|"✅ sink validated"| ICE[("✅ Iceberg lakehouse on MinIO<br/>raw → validated → curated · quarantine")]
     FLINK --> ICE
-    ICE --> TRINO["Trino<br/>analytics"]
+    ICE --> TRINO["✅ Trino<br/>analytics"]
     ICE --> MINING["Scenario mining"]
     MINING --> DATASETS["ML training datasets"] --> MLFLOW["MLflow"]
     MINING --> EMBED["Scenario text + embeddings"]
@@ -34,7 +34,7 @@ Plain-text version:
 
 ```text
 Fleet simulator ──► Kafka ──► Validation / DQ ──┬──► Quarantine ──► Iceberg quarantine (✅)
-     (✅)             │                          ├──► validated.* ──► Iceberg validated → curated (✅) ──► Trino ──┐
+     (✅)             │                          ├──► validated.* ──► Iceberg validated → curated (✅) ──► Trino (✅) ──┐
                       └──► Iceberg raw (✅)      └──► Flink ───────────────┘                                      │
                                                         Iceberg ──► Scenario mining ──┬─► ML datasets ──► MLflow
                                                                                       └─► Embeddings ──► pgvector (✅) ──► RAG (✅)
@@ -49,7 +49,7 @@ Fleet simulator ──► Kafka ──► Validation / DQ ──┬──► Qua
 | Ingestion | Kafka (single-node KRaft) | ✅ | See [ingestion/README.md](../ingestion/README.md) |
 | Data contracts | Schema Registry, validator, quarantine | ✅ | See [validation/README.md](../validation/README.md) |
 | Storage | MinIO + Iceberg (REST catalog on Postgres), PyIceberg writers | ✅ | `raw` / `validated` / `curated` / `quarantine` namespaces; compaction and retention; see [lakehouse/README.md](../lakehouse/README.md) |
-| Analytics | Trino | Phase 6 | |
+| Analytics | Trino 476 over the Iceberg REST catalog | ✅ | Saved queries, benchmarks and query-design notes in [lakehouse/query-design.md](../lakehouse/query-design.md) |
 | Streaming | PyFlink | Phase 9 | Batch scenario mining first |
 | ML | Scenario mining, datasets, MLflow | Phases 7–8, 10 | |
 | AI | pgvector + RAG with tool use | ✅ base exists in `app/` | Moves to `rag/` in Milestone 4 |
