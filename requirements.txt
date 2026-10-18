@@ -1,4 +1,5 @@
-# Data platform (simulator, ingestion, validation). The RAG API has its own: app/requirements.txt
+# Data platform (simulator, ingestion, validation, lakehouse). The RAG API has its own: app/requirements.txt
 -r simulator/requirements.txt
 -r validation/requirements.txt
+-r lakehouse/requirements.txt
 pytest>=8

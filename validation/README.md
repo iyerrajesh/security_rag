@@ -72,8 +72,8 @@ Checks run in this order; the first one that fails gives the reason.
 Quarantined messages keep the **original bytes** as their value, for
 investigation and replay. Their headers are `reason`, `detail`, `source_topic`,
 `source_partition` and `source_offset`. The quarantine topic keeps data for 30
-days, against 7 for the others. The Iceberg quarantine table is deferred to
-Phase 5, which adds Iceberg.
+days, against 7 for the others. `python -m lakehouse sink quarantine` lands them in the
+`quarantine.vehicle` Iceberg table (see [`lakehouse/README.md`](../lakehouse/README.md)).
 
 ### Duplicates and late events
 

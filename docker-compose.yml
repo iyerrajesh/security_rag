@@ -137,7 +137,81 @@ services:
     ports:
       - "127.0.0.1:8080:8080"
 
+  # ---- Lakehouse (Phase 5) -------------------------------------------------
+  # S3-compatible object store for the Iceberg warehouse. API :9000, console :9001.
+  # MinIO stopped publishing images to Docker Hub and Quay; this is the last community build
+  # (bitnamilegacy), which also creates the bucket at start-up.
+  minio:
+    image: bitnamilegacy/minio:2025.4.22
+    profiles: [m1]
+    hostname: minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_DEFAULT_BUCKETS: ${LAKEHOUSE_BUCKET:-warehouse}
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - miniodata:/bitnami/minio/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # Postgres holding the catalog's table pointers. SQLite was tried first: three sinks committing at once
+  # hit "database is locked", which surfaces as a failed commit with an unknown outcome.
+  iceberg-db:
+    image: pgvector/pgvector:pg16  # already pulled for the RAG database; pgvector itself is unused here
+    profiles: [m1]
+    environment:
+      POSTGRES_USER: iceberg
+      POSTGRES_PASSWORD: iceberg
+      POSTGRES_DB: iceberg
+    volumes:
+      - icebergdb:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U iceberg -d iceberg"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Iceberg REST catalog: the pointer from table name to current metadata file.
+  # The pointers live in Postgres; the data lives in MinIO.
+  iceberg-rest:
+    image: tabulario/iceberg-rest:1.6.0
+    profiles: [m1]
+    hostname: iceberg-rest
+    depends_on:
+      minio:
+        condition: service_healthy
+      iceberg-db:
+        condition: service_healthy
+    environment:
+      CATALOG_WAREHOUSE: s3://${LAKEHOUSE_BUCKET:-warehouse}/
+      CATALOG_IO__IMPL: org.apache.iceberg.aws.s3.S3FileIO
+      CATALOG_S3_ENDPOINT: http://minio:9000
+      CATALOG_S3_PATH__STYLE__ACCESS: "true"
+      CATALOG_URI: jdbc:postgresql://iceberg-db:5432/iceberg
+      CATALOG_JDBC_USER: iceberg
+      CATALOG_JDBC_PASSWORD: iceberg
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      AWS_REGION: us-east-1
+      JAVA_TOOL_OPTIONS: -Xms128m -Xmx384m
+    ports:
+      - "127.0.0.1:8181:8181"
+    healthcheck:
+      # The image has no curl or wget: speak HTTP over bash's /dev/tcp.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8181 && printf 'GET /v1/config HTTP/1.0\\r\\n\\r\\n' >&3 && head -1 <&3 | grep -q ' 200 '"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
 volumes:
   pgdata:
   caddy_data:
   kafkadata:
+  miniodata:
+  icebergdb:

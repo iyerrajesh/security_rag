@@ -66,8 +66,8 @@ Decisions that follow:
 - [x] Create topics `vehicle.telemetry`, `vehicle.perception`, `vehicle.planning`,
       `vehicle.health`, `vehicle.software`, keyed/partitioned by `vehicle_id`.
 - [x] Write a Kafka producer sink for the simulator.
-- [ ] Write a consumer that lands raw events to MinIO (prepares for Phase 5).
-      **Deferred to Phase 5**, which adds MinIO.
+- [x] Write a consumer that lands raw events to MinIO (prepares for Phase 5).
+      Done in Phase 5: `python -m lakehouse sink raw`.
 - [x] Benchmark throughput at 100 and 1,000 vehicles; record in `architecture/benchmarks.md`.
 - [x] Document partitioning, ordering, consumer groups, replay, retention,
       throughput, and backpressure in `ingestion/README.md`.
@@ -76,18 +76,26 @@ Decisions that follow:
 
 ### Phase 5 — Lakehouse (Weeks 3–4)
 
-- [ ] Add MinIO and an Iceberg REST catalog to compose; write with PyIceberg.
-- [ ] Kafka → MinIO raw-event consumer (carried over from Phase 3).
-- [ ] `quarantine` Iceberg table fed from `quarantine.vehicle` (carried over from Phase 4).
-- [ ] Create `raw`, `validated`, `curated` namespaces.
-- [ ] Create tables: `raw_perception`, `validated_perception`, `vehicle_telemetry`,
+- [x] Add MinIO and an Iceberg REST catalog to compose; write with PyIceberg.
+      The catalog is backed by Postgres (SQLite locked under concurrent writers); MinIO runs the last
+      community image (`bitnamilegacy/minio`), because MinIO stopped publishing images.
+- [x] Kafka → MinIO raw-event consumer (carried over from Phase 3).
+- [x] `quarantine` Iceberg table fed from `quarantine.vehicle` (carried over from Phase 4).
+- [x] Create `raw`, `validated`, `curated` namespaces (plus `quarantine`).
+- [x] Create tables: `raw_perception`, `validated_perception`, `vehicle_telemetry`,
       `vehicle_health`, `software_deployments`.
-- [ ] Partition strategy: `day(timestamp)` + `bucket(N, vehicle_id)`.
-- [ ] Deliberately create a small-file problem (commit every few seconds), then
+      Built for all five event types in each layer (`raw_<type>`, `validated_<type>`, and
+      `curated.vehicle_perception` / `vehicle_planning` beside the three named). `curated` is the
+      deduplicated layer: `python -m lakehouse curate`.
+- [x] Partition strategy: `day(timestamp)` + `bucket(N, vehicle_id)`. N = 8; see `lakehouse/README.md`.
+- [x] Deliberately create a small-file problem (commit every few seconds), then
       write a compaction job and benchmark query time before/after.
-- [ ] Exercise schema evolution, time travel, and retention/expire-snapshots.
+      `lakehouse/smallfiles.sh`: 879 files became 8; queries 5 to 31 times faster.
+- [x] Exercise schema evolution, time travel, and retention/expire-snapshots.
+      `python -m lakehouse demo all`; orphan-file removal is implemented in `lakehouse/maintenance.py`.
 
 **Deliverables:** Iceberg tables, three layers, partition strategy, compaction job, before/after benchmark.
+All in `lakehouse/`; benchmark in `architecture/benchmarks.md`; end-to-end test `lakehouse/e2e.sh`.
 
 ### Phase 6 — Trino analytics (Week 4)
 
@@ -119,8 +127,8 @@ Trino query returns correlated perception, planning, and telemetry rows.
       `validated.*` or `quarantine.*` topics.
       Dedup is on `event_id` instead: perception emits several objects per timestamp
       (see `validation/README.md`).
-- [ ] Land quarantined records into a `quarantine` Iceberg table with a reason column.
-      **Deferred to Phase 5**, which adds Iceberg. The `quarantine.vehicle` topic exists now.
+- [x] Land quarantined records into a `quarantine` Iceberg table with a reason column.
+      Done in Phase 5: `python -m lakehouse sink quarantine`.
 - [x] Add a `--bad-data-rate` flag to the simulator that injects: missing fields,
       invalid confidence, unknown object types, duplicates, old schema versions,
       corrupt timestamps.

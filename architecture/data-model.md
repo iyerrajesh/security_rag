@@ -125,6 +125,15 @@ into [`schemas/avro/`](../schemas/avro). The registry stores them under
 [`validation/README.md`](../validation/README.md) for how records are checked
 against them.
 
+## Iceberg tables
+
+[`lakehouse/tables.py`](../lakehouse/tables.py) generates each typed table's schema from these models
+(`Optional` fields become optional columns), so a model change is a single edit. Typed tables add `late`,
+`kafka_partition`, `kafka_offset` and `ingest_time`; curated tables add `curated_time`. Every table is partitioned
+by `day(timestamp)` and `bucket(8, vehicle_id)`. Layers and delivery semantics are in
+[`lakehouse/README.md`](../lakehouse/README.md). Adding a field to a model means appending a column to the tables
+with `update_schema().add_column(...)`: see the `evolve` demo (`python -m lakehouse demo evolve`).
+
 ## Ground truth (simulator only)
 
 The simulator also writes `scenarios.jsonl`: one record per injected scenario
